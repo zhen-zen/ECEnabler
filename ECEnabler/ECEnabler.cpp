@@ -88,7 +88,7 @@ void ECE::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t ad
 IOReturn ECE::ecSpaceHandler(UInt32 write, UInt64 addr, UInt32 bits, UInt8 *values64, void *handlerContext, void *RegionContext)
 {
     int maxAddr = 0x100 - (bits / 8);
-    IOReturn result = 0;
+    IOReturn result = kIOReturnSuccess;
     if (addr > maxAddr || values64 == nullptr || handlerContext == nullptr) {
         DBGLOG("ECE", "Addr: 0x%x > MaxAddr: 0x%x", addr, maxAddr);
         return AE_BAD_PARAMETER;
@@ -106,20 +106,20 @@ IOReturn ECE::ecSpaceHandler(UInt32 write, UInt64 addr, UInt32 bits, UInt8 *valu
             RegionContext
         );
     } else {
-        // Split read into 1 byte chunks
-        int maxOffset = bits / 8;
+        int remainingBits = bits;
         int index = 0;
         do {
             result = FunctionCast(ecSpaceHandler, callbackECE->orgACPIEC_ecSpaceHandler) (
                 write,
                 addr + index,
-                8,
+                remainingBits > 8 ? 8 : remainingBits,
                 values64 + index,
                 handlerContext,
                 RegionContext
             );
             index++;
-        } while (index < maxOffset && result == 0);
+            remainingBits -= 8;
+        } while (remainingBits > 0 && result == kIOReturnSuccess);
     }
     
     return result;
